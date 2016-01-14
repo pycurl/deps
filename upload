@@ -1,0 +1,41 @@
+#!/bin/sh
+
+set -e
+
+if test -z "$bintray_api_key"; then
+  echo 'bintray_api_key must be set'
+  exit 2
+fi
+
+upload() {
+  file="$1"
+
+  package=`echo $file |sed -e 's/.tar.xz//'`
+  version=1.0
+
+  curl -sfIL https://api.bintray.com/packages/pycurl/deps/$package || (
+    data=$(cat <<-EOT
+      {"name":"$package",
+      "licenses":["LGPL-2.1", "MIT"],
+      "vcs_url":"https://github.com/pycurl/pycurl"}
+EOT
+    ) &&
+    curl -sfd "$data" -uop:$bintray_api_key -Hcontent-type:application/json https://api.bintray.com/packages/pycurl/deps
+  )
+
+  curl -sfIL https://api.bintray.com/packages/pycurl/deps/$package/versions/$version || (
+    data=$(cat <<-EOT
+      {"name":"$version"}
+EOT
+    ) &&
+    curl -sfd "$data" -uop:$bintray_api_key -Hcontent-type:application/json https://api.bintray.com/packages/pycurl/deps/$package/versions
+  )
+
+  curl -sfT $file -uop:$bintray_api_key https://api.bintray.com/content/pycurl/deps/$package/$version/$file'?publish=1'
+}
+
+for file in `git ls-files |grep tar.xz$`; do
+  echo $file
+
+  curl -sfIL "https://dl.bintray.com/pycurl/deps/$file" || upload $file
+done
