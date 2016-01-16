@@ -7,6 +7,14 @@ if test -z "$bintray_api_key"; then
   exit 2
 fi
 
+delete_package() {
+  file="$1"
+
+  package=`echo $file |sed -e 's/.tar.xz//'`
+
+  curl -vf -uop:$bintray_api_key https://api.bintray.com/packages/pycurl/deps/$package
+}
+
 upload() {
   file="$1"
 
@@ -37,5 +45,6 @@ EOT
 for file in `git ls-files |grep tar.xz$`; do
   echo $file
 
+  delete_package $file
   curl -sfIL "https://dl.bintray.com/pycurl/deps/$file" || upload $file
 done
