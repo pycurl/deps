@@ -7,18 +7,24 @@ if test -z "$bintray_api_key"; then
   exit 2
 fi
 
+curl_verbose=
+
 delete_package() {
   file="$1"
 
-  package=`echo $file |sed -e 's/.tar.xz//'`
+  package=`echo $file |sed -e 's/.tar.xz$//' -e 's/.zip$//'`
 
-  curl -vf -uop:$bintray_api_key https://api.bintray.com/packages/pycurl/deps/$package
+  if curl $curl_verbose -f -uop:$bintray_api_key https://api.bintray.com/packages/pycurl/deps/$package; then
+    echo "Delete $package"
+    curl $curl_verbose -f -uop:$bintray_api_key -X DELETE https://api.bintray.com/packages/pycurl/deps/$package
+  fi
 }
 
 upload() {
   file="$1"
+  path="$2"
 
-  package=`echo $file |sed -e 's/.tar.xz//'`
+  package=`echo $file |sed -e 's/.tar.xz$//' -e 's/.zip$//'`
   version=1.0
 
   curl -sfIL https://api.bintray.com/packages/pycurl/deps/$package || (
@@ -39,12 +45,15 @@ EOT
     curl -sfd "$data" -uop:$bintray_api_key -Hcontent-type:application/json https://api.bintray.com/packages/pycurl/deps/$package/versions
   )
 
-  curl -sfT $file -uop:$bintray_api_key https://api.bintray.com/content/pycurl/deps/$package/$version/$file'?publish=1'
+  curl -sfT $path -uop:$bintray_api_key https://api.bintray.com/content/pycurl/deps/$package/$version/$file'?publish=1'
 }
 
-for file in `git ls-files |grep tar.xz$`; do
+files=`git ls-files |grep tar.xz$`
+files=`echo appveyor/*.zip`
+for path in $files; do
+  file=`basename $path`
   echo $file
 
   delete_package $file
-  curl -sfIL "https://dl.bintray.com/pycurl/deps/$file" || upload $file
+  curl -sfIL "https://dl.bintray.com/pycurl/deps/$file" || upload $file $path
 done
